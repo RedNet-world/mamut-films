@@ -16,6 +16,32 @@
   }
 
   /* ------------------------------------------------------------
+     SEARCH INDEX — single source of truth for services + pages.
+     Uses relative paths resolved against the current page depth.
+     ------------------------------------------------------------ */
+  function getSiteIndex(){
+    const base = detectBasePath();
+    return {
+      services: [
+        { title: 'Videos Institucionales', tagline: 'La esencia de tu empresa en video',        desc: 'Imagen corporativa, cultura organizacional y comunicación interna.', href: base + '/servicios/videos-institucionales.html', n: '01' },
+        { title: 'Comerciales',             tagline: 'Impresión duradera en el consumidor',      desc: 'Spots de TV, digital y social con la calidad que la marca merece.',    href: base + '/servicios/comerciales.html',            n: '02' },
+        { title: 'Cine',                    tagline: 'Historias que permanecen en el tiempo',    desc: 'Largometrajes, documentales y cortometrajes con mirada de autor.',     href: base + '/servicios/cine.html',                   n: '03' },
+        { title: 'Creatividad',             tagline: 'Concepto, guion y dirección creativa',     desc: 'Ideación, escritura y look & feel para campañas y contenido de marca.', href: base + '/servicios/creatividad.html',            n: '04' },
+        { title: 'Producción Ejecutiva',    tagline: 'Un solo interlocutor, cero dolores',       desc: 'Coordinación integral: presupuesto, logística, permisos y entrega.',   href: base + '/servicios/produccion-ejecutiva.html',   n: '05' },
+        { title: 'Marketing y Pauta',       tagline: 'Producción + pauta, con Kore Media',       desc: 'Del storyboard al reporte: producimos la pieza y la pautamos en medios.', href: base + '/servicios/marketing-pauta.html',         n: '06' }
+      ],
+      pages: [
+        { title: 'Inicio',      desc: 'Home de Mamut Films',                     href: base + '/index.html'           },
+        { title: 'Proyectos',   desc: 'Portafolio audiovisual',                  href: base + '/proyectos.html'       },
+        { title: 'Servicios',   desc: 'Todos los servicios de producción',       href: base + '/servicios.html'       },
+        { title: 'Nosotros',    desc: 'Sobre Mamut Films',                       href: base + '/nosotros.html'        },
+        { title: 'Trayectoria', desc: 'Lo que hemos hecho · premios',            href: base + '/lo-que-hicimos.html'  },
+        { title: 'Contacto',    desc: 'Escríbenos o llámanos',                   href: base + '/contacto.html'        }
+      ]
+    };
+  }
+
+  /* ------------------------------------------------------------
      PRELOADER — auto-injects on every page if missing
      ------------------------------------------------------------ */
   function buildPreloaderRow(row, logoUrl){
@@ -248,8 +274,8 @@
         '<a href="https://www.facebook.com/Mamutfilms" target="_blank" rel="noopener" aria-label="Facebook">' +
           '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 21v-7h3l.5-3.5H13V8c0-1 .3-1.8 1.8-1.8H17V3.2C16.5 3.1 15.2 3 13.9 3 11.2 3 9.5 4.6 9.5 7.5v3H7V14h2.5v7H13z"/></svg>' +
         '</a>' +
-        '<a href="https://www.youtube.com/@MamutFilms" target="_blank" rel="noopener" aria-label="YouTube">' +
-          '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21.6 7.2c-.2-1-1-1.7-2-2C17.8 5 12 5 12 5s-5.8 0-7.6.2c-1 .3-1.8 1-2 2C2 9 2 12 2 12s0 3 .4 4.8c.2 1 1 1.7 2 2C6.2 19 12 19 12 19s5.8 0 7.6-.2c1-.3 1.8-1 2-2C22 15 22 12 22 12s0-3-.4-4.8zM10 15V9l5 3-5 3z"/></svg>' +
+        '<a href="https://www.tiktok.com/@mamutfilms" target="_blank" rel="noopener" aria-label="TikTok">' +
+          '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.07A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.84-.1z"/></svg>' +
         '</a>' +
       '</div>';
     nav.appendChild(extras);
@@ -262,9 +288,116 @@
     const trigger = document.querySelector('[data-mega-trigger]');
     const mega = document.querySelector('[data-mega]');
     if (!trigger || !mega) return;
+
+    const idx = getSiteIndex();
+
+    const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
+    const highlight = (text, q) => {
+      if (!q) return escape(text);
+      const safe = escape(text);
+      const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').trim() + ')', 'ig');
+      return safe.replace(re, '<mark>$1</mark>');
+    };
+    const normalize = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const matchScore = (item, q) => {
+      if (!q) return 0;
+      const qn = normalize(q);
+      const hay = normalize([item.title, item.tagline || '', item.desc || ''].join(' '));
+      if (!hay.includes(qn)) return -1;
+      let score = 0;
+      if (normalize(item.title).startsWith(qn)) score += 10;
+      if (normalize(item.title).includes(qn)) score += 5;
+      if ((item.tagline && normalize(item.tagline).includes(qn))) score += 2;
+      return score;
+    };
+
+    const renderCard = (s, q) => (
+      '<a class="megamenu__item" href="' + escape(s.href) + '">' +
+        (s.n ? '<span class="megamenu__item-n">' + s.n + '</span>' : '') +
+        '<h4>' + highlight(s.title, q) + '</h4>' +
+        (s.tagline ? '<p>' + highlight(s.tagline, q) + '</p>' : (s.desc ? '<p>' + highlight(s.desc, q) + '</p>' : '')) +
+        '<span class="arrow-icon">Ver servicio →</span>' +
+      '</a>'
+    );
+
+    const renderPages = (items, q) => items.map((p) => (
+      '<a class="megamenu__page" href="' + escape(p.href) + '">' +
+        '<strong>' + highlight(p.title, q) + '</strong>' +
+        '<span>' + highlight(p.desc, q) + '</span>' +
+      '</a>'
+    )).join('');
+
+    const renderResults = (q) => {
+      const matchedServices = idx.services.map((s) => ({ s, score: matchScore(s, q) })).filter((x) => x.score >= 0).sort((a, b) => b.score - a.score).map((x) => x.s);
+      const matchedPages    = idx.pages   .map((p) => ({ p, score: matchScore(p, q) })).filter((x) => x.score >= 0).sort((a, b) => b.score - a.score).map((x) => x.p);
+      const showAll = !q.trim();
+      const servicesToShow = showAll ? idx.services : matchedServices;
+      const pagesToShow    = showAll ? [] : matchedPages;
+
+      let html = '';
+      if (servicesToShow.length) {
+        html += '<div class="megamenu__items">' + servicesToShow.map((s) => renderCard(s, q)).join('') + '</div>';
+      }
+      if (pagesToShow.length) {
+        html += '<div class="megamenu__pages"><div class="kicker megamenu__pages-label">Otras páginas</div>' + renderPages(pagesToShow, q) + '</div>';
+      }
+      if (!servicesToShow.length && !pagesToShow.length) {
+        html = '<div class="megamenu__empty">Sin resultados para "<strong>' + escape(q) + '</strong>"</div>';
+      }
+      return html;
+    };
+
+    mega.innerHTML =
+      '<div class="megamenu__grid">' +
+        '<div class="megamenu__intro">' +
+          '<div class="kicker">Servicios</div>' +
+          '<h3>Producción audiovisual de alta calidad</h3>' +
+          '<p>Desde una idea hasta el corte final: seis servicios pensados para tu marca, tu historia o tu campaña.</p>' +
+          '<div class="megamenu__search">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
+            '<input type="search" placeholder="Buscar servicios, páginas…" aria-label="Buscar" data-mega-search>' +
+          '</div>' +
+        '</div>' +
+        '<div class="megamenu__body" data-mega-body></div>' +
+      '</div>';
+
+    const body = mega.querySelector('[data-mega-body]');
+    const input = mega.querySelector('[data-mega-search]');
+    const render = (q) => { body.innerHTML = renderResults(q || ''); };
+    render('');
+
+    let debounce;
+    if (input) {
+      input.addEventListener('input', (e) => {
+        clearTimeout(debounce);
+        const q = e.target.value;
+        debounce = setTimeout(() => render(q), 60);
+      });
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const first = body.querySelector('a');
+          if (first) location.href = first.getAttribute('href');
+        }
+      });
+    }
+
+    // Simple dropdown on Servicios link (mobile accordion)
+    const submenu = document.querySelector('[data-submenu]');
+    if (submenu) {
+      submenu.innerHTML = idx.services.map((s) =>
+        '<a href="' + escape(s.href) + '">' + escape(s.title) + '</a>'
+      ).join('');
+    }
+
     let openTimer, closeTimer;
     const open  = () => { clearTimeout(closeTimer); openTimer = setTimeout(() => mega.classList.add('is-open'), 80); };
-    const close = () => { clearTimeout(openTimer);  closeTimer = setTimeout(() => mega.classList.remove('is-open'), 200); };
+    const close = () => {
+      clearTimeout(openTimer);
+      closeTimer = setTimeout(() => {
+        mega.classList.remove('is-open');
+        if (input) { input.value = ''; render(''); }
+      }, 200);
+    };
     const triggerItem = trigger.closest('.nav__item');
     if (triggerItem) {
       triggerItem.addEventListener('mouseenter', () => { if (window.innerWidth > 1024) open(); });
@@ -272,7 +405,21 @@
     }
     mega.addEventListener('mouseenter', () => clearTimeout(closeTimer));
     mega.addEventListener('mouseleave', close);
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') mega.classList.remove('is-open'); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        mega.classList.remove('is-open');
+        if (input) { input.value = ''; render(''); }
+      }
+    });
+
+    trigger.addEventListener('focus', () => { if (window.innerWidth > 1024) open(); });
+    trigger.addEventListener('click', (e) => {
+      if (window.innerWidth > 1024) {
+        e.preventDefault();
+        mega.classList.toggle('is-open');
+        if (mega.classList.contains('is-open') && input) setTimeout(() => input.focus(), 120);
+      }
+    });
   }
 
   /* ------------------------------------------------------------
