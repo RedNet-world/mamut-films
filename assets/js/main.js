@@ -276,7 +276,9 @@
 
       v.muted = true;
       v.playsInline = true;
-      v.setAttribute('preload', v.getAttribute('preload') || 'none');
+      v.setAttribute('autoplay', '');
+      v.setAttribute('loop', '');
+      if (v.getAttribute('preload') === 'none') v.setAttribute('preload', 'metadata');
 
       let ready = false;
       const markReady = () => {
@@ -290,16 +292,25 @@
       v.addEventListener('waiting', () => el.classList.add('is-loading'));
       v.addEventListener('stalled', () => el.classList.add('is-loading'));
 
-      el.addEventListener('mouseenter', () => {
-        if (!ready) el.classList.add('is-loading');
+      const tryPlay = () => {
         const p = v.play();
         if (p && p.catch) p.catch(() => {});
-      });
-      el.addEventListener('mouseleave', () => {
-        el.classList.remove('is-loading');
-        v.pause();
-        v.currentTime = 0;
-      });
+      };
+      if (!ready) el.classList.add('is-loading');
+      tryPlay();
+
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              tryPlay();
+            } else {
+              v.pause();
+            }
+          });
+        }, { threshold: 0.1 });
+        io.observe(el);
+      }
     });
   }
 
