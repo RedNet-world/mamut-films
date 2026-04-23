@@ -135,16 +135,33 @@
   }
 
   /* ------------------------------------------------------------
-     HEADER — sticky + hide on scroll down
+     HEADER — sticky + hide on scroll down + dynamic --header-h var
      ------------------------------------------------------------ */
   function initHeader(){
     const header = document.querySelector('[data-header]');
     if (!header) return;
+
+    const setVar = () => {
+      const h = Math.round(header.getBoundingClientRect().height);
+      if (h > 0) document.documentElement.style.setProperty('--header-h', h + 'px');
+    };
+    setVar();
+
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(setVar).observe(header);
+    }
+    window.addEventListener('resize', setVar, { passive: true });
+    window.addEventListener('orientationchange', setVar, { passive: true });
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(setVar).catch(() => {});
+    }
+
     let ticking = false;
     const onScroll = () => {
       const y = window.scrollY;
       if (y > 40) header.classList.add('is-scrolled');
       else header.classList.remove('is-scrolled');
+      setVar();
       ticking = false;
     };
     window.addEventListener('scroll', () => {
