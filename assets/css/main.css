@@ -1032,6 +1032,56 @@ ul { list-style: none; }
   align-items: center; flex-wrap: wrap; gap: 20px;
   font-size: 12px; color: var(--text-muted); letter-spacing: 0.05em;
 }
+/* ============================================================
+   CLIENT LOGOS — unified sizing + white rendering
+   ============================================================ */
+.client-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  width: auto;
+  max-width: 180px;
+  flex-shrink: 0;
+  opacity: 0.72;
+  transition: opacity 0.4s var(--easing);
+}
+.client-logo img {
+  display: block;
+  height: 32px;
+  width: auto;
+  max-width: 180px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+.client-logo:hover { opacity: 1; }
+.client-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 20px;
+  min-height: 100px;
+  border: 1px solid var(--line);
+  transition: border-color 0.4s var(--easing), background 0.4s var(--easing);
+}
+.client-card:hover { border-color: var(--accent); background: rgba(185, 146, 94, 0.04); }
+.client-card .client-logo { opacity: 0.85; height: 36px; max-width: 150px; }
+.client-card .client-logo img { height: 36px; max-width: 150px; }
+.client-card:hover .client-logo { opacity: 1; }
+@media (max-width: 900px) {
+  .client-logo, .client-logo img { height: 28px; max-width: 140px; }
+  .client-card { padding: 22px 16px; min-height: 84px; }
+  .client-card .client-logo, .client-card .client-logo img { height: 32px; max-width: 130px; }
+}
+
+.clients-marquee__item { display: inline-flex; align-items: center; }
+.clients-marquee__item .client-logo { height: 42px; max-width: 200px; opacity: 0.78; }
+.clients-marquee__item .client-logo img { height: 42px; max-width: 200px; }
+@media (max-width: 900px) {
+  .clients-marquee__item .client-logo,
+  .clients-marquee__item .client-logo img { height: 32px; max-width: 160px; }
+}
+
 .footer__dev {
   margin-top: 18px;
   padding-top: 18px;
