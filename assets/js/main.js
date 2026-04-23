@@ -424,12 +424,25 @@
       bg.appendChild(v);
       cta.insertBefore(bg, cta.firstChild);
 
-      const markReady = () => v.classList.add('is-ready');
+      const START_AT = 10;
+      let seeded = false;
+      const seedStart = () => {
+        if (seeded) return;
+        if (!isFinite(v.duration) || v.duration <= 0) return;
+        const t = v.duration > START_AT + 0.5 ? START_AT : 0;
+        try { v.currentTime = t; } catch (e) {}
+        seeded = true;
+      };
+      v.addEventListener('loadedmetadata', seedStart);
+      v.addEventListener('durationchange', seedStart);
+
+      const markReady = () => { seedStart(); v.classList.add('is-ready'); };
       v.addEventListener('loadeddata', markReady);
       v.addEventListener('canplay', markReady);
       v.addEventListener('playing', markReady);
 
       const tryPlay = () => {
+        seedStart();
         const p = v.play();
         if (p && p.catch) p.catch(() => {});
       };
