@@ -560,23 +560,61 @@
     if (v.readyState >= 2) mark();
     v.addEventListener('loadeddata', mark);
     v.addEventListener('playing', mark);
-
-    const START_AT = 15;
-    let seeded = false;
-    const seedStart = () => {
-      if (seeded) return;
-      if (!isFinite(v.duration) || v.duration <= 0) return;
-      const t = v.duration > START_AT + 0.5 ? START_AT : 0;
-      try { v.currentTime = t; } catch (e) {}
-      seeded = true;
-    };
-    v.addEventListener('loadedmetadata', seedStart);
-    v.addEventListener('durationchange', seedStart);
-    if (v.readyState >= 1) seedStart();
+    seedAtFifteen(v);
   }
 
   /* ------------------------------------------------------------
-     SERVICE HERO VIDEO (landings): fade-in, no time seed
+     HERO VIDEO POOL (shared by service-hero, page-head, CTA)
+     ------------------------------------------------------------ */
+  const HERO_VIDEO_POOL = [
+    'https://mamutfilms.com.co/wp-content/uploads/2025/05/REEL_MAMUT_2025_V1_0516.mp4',
+    'https://mamutfilms.com.co/wp-content/uploads/2025/08/Ultima-Milla-I-Inter-Rapidisimo-Dia-del-Nino-2025-Inter-Rapidisimo-1080p-h264.mp4',
+    'https://mamutfilms.com.co/wp-content/uploads/2025/06/Apuestas-D-cut.mp4',
+    'https://mamutfilms.com.co/wp-content/uploads/2025/06/Compras-D´cut.mp4',
+    'https://mamutfilms.com.co/wp-content/uploads/2025/06/Obligaciones-D´cut.mp4',
+    'https://mamutfilms.com.co/wp-content/uploads/2025/06/Pago-servicios-D´cut.mp4',
+    'https://mamutfilms.com.co/wp-content/uploads/2025/04/Juan-David-Botero.mp4'
+  ];
+
+  /* Deterministic index per page slug — creates an interleaved pattern */
+  const PAGE_VIDEO_INDEX = {
+    'index':               0,
+    '':                    0,
+    'proyectos':           2,
+    'servicios':           1,
+    'nosotros':            3,
+    'lo-que-hicimos':      5,
+    'contacto':            6,
+    'augusto-castillo':    2,
+    'carolina-bermudez':   4,
+    'hugo-rubiano':        6,
+    'juan-david-botero':   1,
+    'luis-garcia':         3,
+    'mateo-hincapie':      5
+  };
+
+  function currentPageSlug(){
+    const last = location.pathname.split('/').filter(Boolean).pop() || 'index';
+    return last.replace(/\.html$/, '');
+  }
+
+  /* Utility: seed a video to start at t=15s (or 0 if too short) */
+  function seedAtFifteen(v){
+    let seeded = false;
+    const seed = () => {
+      if (seeded) return;
+      if (!isFinite(v.duration) || v.duration <= 0) return;
+      const t = v.duration > 15.5 ? 15 : 0;
+      try { v.currentTime = t; } catch(e) {}
+      seeded = true;
+    };
+    v.addEventListener('loadedmetadata', seed);
+    v.addEventListener('durationchange', seed);
+    if (v.readyState >= 1) seed();
+  }
+
+  /* ------------------------------------------------------------
+     SERVICE HERO VIDEOS (landings already have <video> in HTML)
      ------------------------------------------------------------ */
   function initServiceHeroVideos(){
     document.querySelectorAll('.service-hero__video video').forEach((v) => {
@@ -585,9 +623,65 @@
       v.addEventListener('loadeddata', mark);
       v.addEventListener('playing', mark);
       v.addEventListener('canplay', mark);
+      seedAtFifteen(v);
       const tryPlay = () => { const p = v.play(); if (p && p.catch) p.catch(() => {}); };
       tryPlay();
     });
+  }
+
+  /* ------------------------------------------------------------
+     PAGE HEAD VIDEOS — inject a video hero on every .page-head.
+     Uses deterministic rotation so each page gets a different one.
+     Avoids duplicating a video already present elsewhere on the page.
+     ------------------------------------------------------------ */
+  function initPageHeroVideos(){
+    const pageHead = document.querySelector('.page-head');
+    if (!pageHead) return;
+    if (pageHead.classList.contains('page-head--video')) return;
+
+    const slug = currentPageSlug();
+    const baseIdx = PAGE_VIDEO_INDEX[slug];
+    if (baseIdx === undefined) return;
+
+    // Collect URLs already on this page (to avoid duplicating)
+    const used = new Set();
+    document.querySelectorAll('video source[src]').forEach((s) => {
+      if (s.src) used.add(s.getAttribute('src'));
+    });
+
+    // Pick first non-used URL starting from baseIdx, rotating through pool
+    let picked = HERO_VIDEO_POOL[baseIdx];
+    for (let i = 0; i < HERO_VIDEO_POOL.length; i++) {
+      const candidate = HERO_VIDEO_POOL[(baseIdx + i) % HERO_VIDEO_POOL.length];
+      if (!used.has(candidate)) { picked = candidate; break; }
+    }
+
+    // Inject video element into the page-head
+    const wrap = document.createElement('div');
+    wrap.className = 'page-head__video';
+    const vid = document.createElement('video');
+    vid.autoplay = true; vid.muted = true; vid.loop = true; vid.playsInline = true;
+    vid.setAttribute('muted', '');
+    vid.setAttribute('playsinline', '');
+    vid.setAttribute('preload', 'metadata');
+    vid.setAttribute('aria-hidden', 'true');
+    vid.setAttribute('tabindex', '-1');
+    const source = document.createElement('source');
+    source.src = picked;
+    source.type = 'video/mp4';
+    vid.appendChild(source);
+    wrap.appendChild(vid);
+
+    pageHead.insertBefore(wrap, pageHead.firstChild);
+    pageHead.classList.add('page-head--video');
+
+    const markReady = () => vid.classList.add('is-ready');
+    vid.addEventListener('loadeddata', markReady);
+    vid.addEventListener('canplay', markReady);
+    vid.addEventListener('playing', markReady);
+    seedAtFifteen(vid);
+    const tryPlay = () => { const p = vid.play(); if (p && p.catch) p.catch(() => {}); };
+    tryPlay();
   }
 
   /* ------------------------------------------------------------
@@ -739,6 +833,7 @@
     initSearchOverlay();
     initHeroVideo();
     initServiceHeroVideos();
+    initPageHeroVideos();
     initVideoHover();
     initCtaVideoBackgrounds();
     initReveal();
