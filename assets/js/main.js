@@ -238,6 +238,11 @@
       });
     });
 
+    // Close mobile menu when the mobile search button is tapped
+    nav.addEventListener('click', (e) => {
+      if (e.target.closest('[data-search-open]')) closeMenu();
+    });
+
     // Close on Escape
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && nav.classList.contains('is-open')) closeMenu();
@@ -262,6 +267,10 @@
     const extras = document.createElement('div');
     extras.className = 'nav__extras';
     extras.innerHTML =
+      '<button class="nav__search-btn" data-search-open type="button" aria-label="Buscar">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
+        '<span>Buscar servicios, páginas…</span>' +
+      '</button>' +
       '<div class="nav__contact">' +
         '<span class="kicker">Contacto directo</span>' +
         '<a href="mailto:contacto@mamutfilms.com.co">contacto@mamutfilms.com.co</a>' +
@@ -332,13 +341,14 @@
         '</div>' +
       '</div>';
 
-    // Mobile submenu (6 services)
-    const submenu = document.querySelector('[data-submenu]');
-    if (submenu) {
+    // Mobile submenu — populate ALL .nav__submenu elements (with or without data-submenu attr)
+    // so old HTML pages also show the 6 services in the accordion.
+    const allSubmenus = document.querySelectorAll('.nav__submenu, [data-submenu]');
+    allSubmenus.forEach((submenu) => {
       submenu.innerHTML = idx.services.map((s) =>
         '<a href="' + escHtml(s.href) + '">' + escHtml(s.title) + '</a>'
       ).join('');
-    }
+    });
 
     let openTimer, closeTimer;
     const open  = () => { clearTimeout(closeTimer); openTimer = setTimeout(() => mega.classList.add('is-open'), 80); };
@@ -709,6 +719,8 @@
   function initClientMarquee(){
     document.querySelectorAll('[data-marquee]').forEach(track => {
       if (track.dataset.doubled === '1') return;
+      // Duplicate the content ONCE so the CSS animation (translateX 0 → -50%)
+      // produces a perfectly seamless infinite loop.
       track.innerHTML = track.innerHTML + track.innerHTML;
       track.dataset.doubled = '1';
     });
