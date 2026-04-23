@@ -374,6 +374,81 @@
   }
 
   /* ------------------------------------------------------------
+     CTA VIDEO BACKGROUNDS
+     Each .cta section gets an autoplay/looped video behind it.
+     The same video is never repeated on the same page.
+     ------------------------------------------------------------ */
+  const CTA_VIDEO_POOL = [
+    'https://mamutfilms.com.co/wp-content/uploads/2025/05/REEL_MAMUT_2025_V1_0516.mp4',
+    'https://mamutfilms.com.co/wp-content/uploads/2025/08/Ultima-Milla-I-Inter-Rapidisimo-Dia-del-Nino-2025-Inter-Rapidisimo-1080p-h264.mp4',
+    'https://mamutfilms.com.co/wp-content/uploads/2025/06/Apuestas-D-cut.mp4',
+    'https://mamutfilms.com.co/wp-content/uploads/2025/06/Compras-D´cut.mp4',
+    'https://mamutfilms.com.co/wp-content/uploads/2025/06/Obligaciones-D´cut.mp4',
+    'https://mamutfilms.com.co/wp-content/uploads/2025/06/Pago-servicios-D´cut.mp4',
+    'https://mamutfilms.com.co/wp-content/uploads/2025/04/Juan-David-Botero.mp4'
+  ];
+
+  function initCtaVideoBackgrounds(){
+    const ctas = document.querySelectorAll('.cta');
+    if (!ctas.length) return;
+
+    const usedOnPage = new Set();
+    document.querySelectorAll('video source[src]').forEach(s => {
+      const src = s.getAttribute('src');
+      if (src) usedOnPage.add(src);
+    });
+
+    ctas.forEach((cta) => {
+      if (cta.querySelector('.cta__bg')) return;
+
+      let pick = CTA_VIDEO_POOL.find(u => !usedOnPage.has(u));
+      if (!pick) pick = CTA_VIDEO_POOL[Math.floor(Math.random() * CTA_VIDEO_POOL.length)];
+      usedOnPage.add(pick);
+
+      const bg = document.createElement('div');
+      bg.className = 'cta__bg';
+      const v = document.createElement('video');
+      v.autoplay = true;
+      v.muted = true;
+      v.loop = true;
+      v.playsInline = true;
+      v.setAttribute('muted', '');
+      v.setAttribute('playsinline', '');
+      v.setAttribute('preload', 'metadata');
+      v.setAttribute('aria-hidden', 'true');
+      v.setAttribute('tabindex', '-1');
+      const source = document.createElement('source');
+      source.src = pick;
+      source.type = 'video/mp4';
+      v.appendChild(source);
+      bg.appendChild(v);
+      cta.insertBefore(bg, cta.firstChild);
+
+      const markReady = () => v.classList.add('is-ready');
+      v.addEventListener('loadeddata', markReady);
+      v.addEventListener('canplay', markReady);
+      v.addEventListener('playing', markReady);
+
+      const tryPlay = () => {
+        const p = v.play();
+        if (p && p.catch) p.catch(() => {});
+      };
+
+      if ('IntersectionObserver' in window) {
+        const io = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) tryPlay();
+            else v.pause();
+          });
+        }, { threshold: 0.1 });
+        io.observe(cta);
+      } else {
+        tryPlay();
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------
      CURRENT YEAR + ACTIVE LINK
      ------------------------------------------------------------ */
   function initYear(){
@@ -402,6 +477,7 @@
     initMegaMenu();
     initHeroVideo();
     initVideoHover();
+    initCtaVideoBackgrounds();
     initReveal();
     initClientMarquee();
     initYear();
