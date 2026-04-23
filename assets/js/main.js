@@ -284,6 +284,28 @@
   /* ------------------------------------------------------------
      MEGA MENU (desktop)
      ------------------------------------------------------------ */
+  /* Shared search utilities */
+  function escHtml(s){ return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]); }
+  function escRe(s){ return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function norm(s){ return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  function highlight(text, q){
+    const safe = escHtml(text);
+    if (!q || !q.trim()) return safe;
+    const re = new RegExp('(' + escRe(q.trim()) + ')', 'ig');
+    return safe.replace(re, '<mark>$1</mark>');
+  }
+  function matchScore(item, q){
+    if (!q) return 0;
+    const qn = norm(q);
+    const hay = norm([item.title, item.tagline || '', item.desc || ''].join(' '));
+    if (!hay.includes(qn)) return -1;
+    let score = 0;
+    if (norm(item.title).startsWith(qn)) score += 10;
+    if (norm(item.title).includes(qn)) score += 5;
+    if ((item.tagline && norm(item.tagline).includes(qn))) score += 2;
+    return score;
+  }
+
   function initMegaMenu(){
     const trigger = document.querySelector('[data-mega-trigger]');
     const mega = document.querySelector('[data-mega]');
@@ -291,113 +313,36 @@
 
     const idx = getSiteIndex();
 
-    const escape = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' })[c]);
-    const highlight = (text, q) => {
-      if (!q) return escape(text);
-      const safe = escape(text);
-      const re = new RegExp('(' + q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').trim() + ')', 'ig');
-      return safe.replace(re, '<mark>$1</mark>');
-    };
-    const normalize = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    const matchScore = (item, q) => {
-      if (!q) return 0;
-      const qn = normalize(q);
-      const hay = normalize([item.title, item.tagline || '', item.desc || ''].join(' '));
-      if (!hay.includes(qn)) return -1;
-      let score = 0;
-      if (normalize(item.title).startsWith(qn)) score += 10;
-      if (normalize(item.title).includes(qn)) score += 5;
-      if ((item.tagline && normalize(item.tagline).includes(qn))) score += 2;
-      return score;
-    };
-
-    const renderCard = (s, q) => (
-      '<a class="megamenu__item" href="' + escape(s.href) + '">' +
-        (s.n ? '<span class="megamenu__item-n">' + s.n + '</span>' : '') +
-        '<h4>' + highlight(s.title, q) + '</h4>' +
-        (s.tagline ? '<p>' + highlight(s.tagline, q) + '</p>' : (s.desc ? '<p>' + highlight(s.desc, q) + '</p>' : '')) +
-        '<span class="arrow-icon">Ver servicio →</span>' +
-      '</a>'
-    );
-
-    const renderPages = (items, q) => items.map((p) => (
-      '<a class="megamenu__page" href="' + escape(p.href) + '">' +
-        '<strong>' + highlight(p.title, q) + '</strong>' +
-        '<span>' + highlight(p.desc, q) + '</span>' +
-      '</a>'
-    )).join('');
-
-    const renderResults = (q) => {
-      const matchedServices = idx.services.map((s) => ({ s, score: matchScore(s, q) })).filter((x) => x.score >= 0).sort((a, b) => b.score - a.score).map((x) => x.s);
-      const matchedPages    = idx.pages   .map((p) => ({ p, score: matchScore(p, q) })).filter((x) => x.score >= 0).sort((a, b) => b.score - a.score).map((x) => x.p);
-      const showAll = !q.trim();
-      const servicesToShow = showAll ? idx.services : matchedServices;
-      const pagesToShow    = showAll ? [] : matchedPages;
-
-      let html = '';
-      if (servicesToShow.length) {
-        html += '<div class="megamenu__items">' + servicesToShow.map((s) => renderCard(s, q)).join('') + '</div>';
-      }
-      if (pagesToShow.length) {
-        html += '<div class="megamenu__pages"><div class="kicker megamenu__pages-label">Otras páginas</div>' + renderPages(pagesToShow, q) + '</div>';
-      }
-      if (!servicesToShow.length && !pagesToShow.length) {
-        html = '<div class="megamenu__empty">Sin resultados para "<strong>' + escape(q) + '</strong>"</div>';
-      }
-      return html;
-    };
-
     mega.innerHTML =
       '<div class="megamenu__grid">' +
         '<div class="megamenu__intro">' +
           '<div class="kicker">Servicios</div>' +
           '<h3>Producción audiovisual de alta calidad</h3>' +
-          '<p>Desde una idea hasta el corte final: seis servicios pensados para tu marca, tu historia o tu campaña.</p>' +
-          '<div class="megamenu__search">' +
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
-            '<input type="search" placeholder="Buscar servicios, páginas…" aria-label="Buscar" data-mega-search>' +
-          '</div>' +
+          '<p>Seis servicios pensados para tu marca, tu historia o tu campaña.</p>' +
         '</div>' +
-        '<div class="megamenu__body" data-mega-body></div>' +
+        '<div class="megamenu__items">' +
+          idx.services.map((s) => (
+            '<a class="megamenu__item" href="' + escHtml(s.href) + '">' +
+              '<span class="megamenu__item-n">' + s.n + '</span>' +
+              '<h4>' + escHtml(s.title) + '</h4>' +
+              '<p>' + escHtml(s.tagline || s.desc || '') + '</p>' +
+              '<span class="arrow-icon">Ver servicio →</span>' +
+            '</a>'
+          )).join('') +
+        '</div>' +
       '</div>';
 
-    const body = mega.querySelector('[data-mega-body]');
-    const input = mega.querySelector('[data-mega-search]');
-    const render = (q) => { body.innerHTML = renderResults(q || ''); };
-    render('');
-
-    let debounce;
-    if (input) {
-      input.addEventListener('input', (e) => {
-        clearTimeout(debounce);
-        const q = e.target.value;
-        debounce = setTimeout(() => render(q), 60);
-      });
-      input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-          const first = body.querySelector('a');
-          if (first) location.href = first.getAttribute('href');
-        }
-      });
-    }
-
-    // Simple dropdown on Servicios link (mobile accordion)
+    // Mobile submenu (6 services)
     const submenu = document.querySelector('[data-submenu]');
     if (submenu) {
       submenu.innerHTML = idx.services.map((s) =>
-        '<a href="' + escape(s.href) + '">' + escape(s.title) + '</a>'
+        '<a href="' + escHtml(s.href) + '">' + escHtml(s.title) + '</a>'
       ).join('');
     }
 
     let openTimer, closeTimer;
     const open  = () => { clearTimeout(closeTimer); openTimer = setTimeout(() => mega.classList.add('is-open'), 80); };
-    const close = () => {
-      clearTimeout(openTimer);
-      closeTimer = setTimeout(() => {
-        mega.classList.remove('is-open');
-        if (input) { input.value = ''; render(''); }
-      }, 200);
-    };
+    const close = () => { clearTimeout(openTimer); closeTimer = setTimeout(() => mega.classList.remove('is-open'), 200); };
     const triggerItem = trigger.closest('.nav__item');
     if (triggerItem) {
       triggerItem.addEventListener('mouseenter', () => { if (window.innerWidth > 1024) open(); });
@@ -405,19 +350,146 @@
     }
     mega.addEventListener('mouseenter', () => clearTimeout(closeTimer));
     mega.addEventListener('mouseleave', close);
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') {
-        mega.classList.remove('is-open');
-        if (input) { input.value = ''; render(''); }
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') mega.classList.remove('is-open'); });
+  }
+
+  /* ------------------------------------------------------------
+     HEADER AUX (desktop only): search icon + social icons
+     Injected into the header so we don't have to edit 18 HTMLs.
+     ------------------------------------------------------------ */
+  function initHeaderAux(){
+    const header = document.querySelector('[data-header]');
+    if (!header || header.querySelector('.header__aux')) return;
+
+    const aux = document.createElement('div');
+    aux.className = 'header__aux';
+    aux.innerHTML =
+      '<button class="header__search-btn" data-search-open aria-label="Buscar" title="Buscar (⌘K / Ctrl+K)">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
+      '</button>' +
+      '<div class="header__social">' +
+        '<a href="https://www.instagram.com/mamutfilms/" target="_blank" rel="noopener" aria-label="Instagram">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>' +
+        '</a>' +
+        '<a href="https://www.facebook.com/Mamutfilms" target="_blank" rel="noopener" aria-label="Facebook">' +
+          '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 21v-7h3l.5-3.5H13V8c0-1 .3-1.8 1.8-1.8H17V3.2C16.5 3.1 15.2 3 13.9 3 11.2 3 9.5 4.6 9.5 7.5v3H7V14h2.5v7H13z"/></svg>' +
+        '</a>' +
+        '<a href="https://www.tiktok.com/@mamutfilms" target="_blank" rel="noopener" aria-label="TikTok">' +
+          '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.07A6.33 6.33 0 0 0 5.8 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.84-.1z"/></svg>' +
+        '</a>' +
+      '</div>';
+
+    const toggle = header.querySelector('[data-nav-toggle]');
+    if (toggle) header.insertBefore(aux, toggle);
+    else header.appendChild(aux);
+  }
+
+  /* ------------------------------------------------------------
+     SEARCH OVERLAY — fullscreen search launched from header btn
+     ------------------------------------------------------------ */
+  function initSearchOverlay(){
+    if (document.querySelector('[data-search-overlay]')) return;
+    const idx = getSiteIndex();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'search-overlay';
+    overlay.setAttribute('data-search-overlay', '');
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.innerHTML =
+      '<button class="search-overlay__close" data-search-close aria-label="Cerrar búsqueda">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"/></svg>' +
+      '</button>' +
+      '<div class="search-overlay__inner">' +
+        '<div class="search-overlay__bar">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>' +
+          '<input type="search" placeholder="Buscar servicios, páginas…" aria-label="Buscar" data-search-input autocomplete="off">' +
+          '<kbd class="search-overlay__kbd">ESC</kbd>' +
+        '</div>' +
+        '<div class="search-overlay__hint">Escribe para filtrar · Enter para abrir el primer resultado</div>' +
+        '<div class="search-overlay__body" data-search-body></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    const input = overlay.querySelector('[data-search-input]');
+    const body = overlay.querySelector('[data-search-body]');
+
+    const renderResults = (q) => {
+      const showAll = !q || !q.trim();
+      const services = showAll
+        ? idx.services
+        : idx.services.map((s) => ({ s, sc: matchScore(s, q) })).filter((x) => x.sc >= 0).sort((a, b) => b.sc - a.sc).map((x) => x.s);
+      const pages = showAll
+        ? []
+        : idx.pages.map((p) => ({ p, sc: matchScore(p, q) })).filter((x) => x.sc >= 0).sort((a, b) => b.sc - a.sc).map((x) => x.p);
+
+      let html = '';
+      if (services.length) {
+        html += '<div class="search-overlay__section"><div class="kicker">Servicios</div><div class="search-overlay__grid">';
+        html += services.map((s) => (
+          '<a class="search-overlay__item" href="' + escHtml(s.href) + '">' +
+            '<span class="search-overlay__item-n">' + s.n + '</span>' +
+            '<strong>' + highlight(s.title, q) + '</strong>' +
+            '<span class="search-overlay__item-tag">' + highlight(s.tagline || '', q) + '</span>' +
+          '</a>'
+        )).join('');
+        html += '</div></div>';
+      }
+      if (pages.length) {
+        html += '<div class="search-overlay__section"><div class="kicker">Páginas</div><div class="search-overlay__grid search-overlay__grid--pages">';
+        html += pages.map((p) => (
+          '<a class="search-overlay__item search-overlay__item--page" href="' + escHtml(p.href) + '">' +
+            '<strong>' + highlight(p.title, q) + '</strong>' +
+            '<span class="search-overlay__item-tag">' + highlight(p.desc, q) + '</span>' +
+          '</a>'
+        )).join('');
+        html += '</div></div>';
+      }
+      if (!services.length && !pages.length) {
+        html = '<div class="search-overlay__empty">Sin resultados para <strong>"' + escHtml(q) + '"</strong></div>';
+      }
+      body.innerHTML = html;
+    };
+    renderResults('');
+
+    let debounce;
+    input.addEventListener('input', (e) => {
+      clearTimeout(debounce);
+      const q = e.target.value;
+      debounce = setTimeout(() => renderResults(q), 50);
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const first = body.querySelector('a');
+        if (first) location.href = first.getAttribute('href');
       }
     });
 
-    trigger.addEventListener('focus', () => { if (window.innerWidth > 1024) open(); });
-    trigger.addEventListener('click', (e) => {
-      if (window.innerWidth > 1024) {
+    const openOverlay = () => {
+      overlay.classList.add('is-open');
+      overlay.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('is-locked');
+      setTimeout(() => input.focus(), 80);
+    };
+    const closeOverlay = () => {
+      overlay.classList.remove('is-open');
+      overlay.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('is-locked');
+      input.value = '';
+      renderResults('');
+    };
+
+    document.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-search-open]');
+      if (btn) { e.preventDefault(); openOverlay(); return; }
+      const close = e.target.closest('[data-search-close]');
+      if (close) { e.preventDefault(); closeOverlay(); return; }
+      if (e.target === overlay) closeOverlay();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeOverlay();
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        mega.classList.toggle('is-open');
-        if (mega.classList.contains('is-open') && input) setTimeout(() => input.focus(), 120);
+        if (overlay.classList.contains('is-open')) closeOverlay(); else openOverlay();
       }
     });
   }
@@ -488,6 +560,34 @@
     if (v.readyState >= 2) mark();
     v.addEventListener('loadeddata', mark);
     v.addEventListener('playing', mark);
+
+    const START_AT = 15;
+    let seeded = false;
+    const seedStart = () => {
+      if (seeded) return;
+      if (!isFinite(v.duration) || v.duration <= 0) return;
+      const t = v.duration > START_AT + 0.5 ? START_AT : 0;
+      try { v.currentTime = t; } catch (e) {}
+      seeded = true;
+    };
+    v.addEventListener('loadedmetadata', seedStart);
+    v.addEventListener('durationchange', seedStart);
+    if (v.readyState >= 1) seedStart();
+  }
+
+  /* ------------------------------------------------------------
+     SERVICE HERO VIDEO (landings): fade-in, no time seed
+     ------------------------------------------------------------ */
+  function initServiceHeroVideos(){
+    document.querySelectorAll('.service-hero__video video').forEach((v) => {
+      const mark = () => v.classList.add('is-ready');
+      if (v.readyState >= 2) mark();
+      v.addEventListener('loadeddata', mark);
+      v.addEventListener('playing', mark);
+      v.addEventListener('canplay', mark);
+      const tryPlay = () => { const p = v.play(); if (p && p.catch) p.catch(() => {}); };
+      tryPlay();
+    });
   }
 
   /* ------------------------------------------------------------
@@ -632,10 +732,13 @@
   document.addEventListener('DOMContentLoaded', () => {
     initPreloader();
     initHeader();
+    initHeaderAux();
     initMobileNav();
     initMobileExtras();
     initMegaMenu();
+    initSearchOverlay();
     initHeroVideo();
+    initServiceHeroVideos();
     initVideoHover();
     initCtaVideoBackgrounds();
     initReveal();
